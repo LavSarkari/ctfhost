@@ -1,0 +1,93 @@
+#!/bin/bash
+
+# ╔════════════════════════════════════╗
+# ║    🧠  CTFHOST — By Lav Sarkari     ║
+# ╚════════════════════════════════════╝
+
+HOSTS_FILE="/etc/hosts"
+LOG_FILE="$HOME/.addhost.log"
+BOLD="\e[1m"
+GREEN="\e[32m"
+RED="\e[31m"
+YELLOW="\e[33m"
+BLUE="\e[36m"
+RESET="\e[0m"
+
+function banner() {
+    echo -e "${BOLD}${BLUE}╔═══════════════════════════════════════════════════╗"
+    echo -e "║           🚀 CTFHOST — CTF DNS MANAGER            ║"
+    echo -e "╚═══════════════════════════════════════════════════╝${RESET}"
+}
+
+function log() {
+    echo "[$(date)] $1" >> "$LOG_FILE"
+}
+
+function get_ip() {
+    local ip=$(ip addr show tun0 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -n1)
+    if [[ -z "$ip" ]]; then
+        ip=$(ip addr show eth0 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -n1)
+    fi
+    if [[ -z "$ip" ]]; then
+        ip=$(ip addr show wlan0 2>/dev/null | grep -oP '(?<=inet\s)\d+(\.\d+){3}' | head -n1)
+    fi
+    echo "$ip"
+}
+
+function add_entry() {
+    local ip=$1
+    local domain=$2
+    if grep -q "[[:space:]]$domain" "$HOSTS_FILE"; then
+        echo -e "${YELLOW}[!] Entry for ${domain} already exists.${RESET}"
+    else
+        echo "$ip $domain" | sudo tee -a "$HOSTS_FILE" > /dev/null
+        echo -e "${GREEN}[+] Added: $domain ↦ $ip${RESET}"
+        local sys_ip=$(get_ip)
+        echo -e "${BLUE}host => $domain at $ip, system VPN IP: $sys_ip${RESET}"
+        log "Added: $ip $domain"
+    fi
+}
+
+# Allow calling as `addhost <ip> <domain>` directly
+if [[ "$1" =~ ^[0-9]+(\.[0-9]+){3}$ && -n "$2" ]]; then
+    banner && add_entry "$1" "$2"
+    exit
+fi
+
+function remove_entry() {
+    local domain=$1
+    sudo sed -i.bak "/[[:space:]]$domain$/d" "$HOSTS_FILE"
+    echo -e "${RED}[-] Removed entry for $domain${RESET}"
+    log "Removed: $domain"
+}
+
+function list_entries() {
+    echo -e "${BOLD}Current .thm/.htb host entries:${RESET}"
+    grep -E "\\.thm$|\\.htb$" "$HOSTS_FILE"
+}
+
+function flush_entries() {
+    sudo sed -i.bak '/[[:space:]]\(thm\|htb\)$/d' "$HOSTS_FILE"
+    echo -e "${RED}[×] Flushed all .thm and .htb entries.${RESET}"
+    log "Flushed all .thm/.htb entries"
+}
+
+case "$1" in
+    add) banner && add_entry "$2" "$3" ;;
+    rm) banner && remove_entry "$2" ;;
+    list) banner && list_entries ;;
+    flush) banner && flush_entries ;;
+    *)
+        banner
+        echo -e "${YELLOW}Usage:${RESET}"
+        echo "  ctfhost add <ip> <domain>    → Add entry to /etc/hosts"
+        echo "  ctfhost rm <domain>          → Remove entry from /etc/hosts"
+        echo "  ctfhost list                 → List all .thm/.htb entries"
+        echo "  ctfhost flush                → Flush all .thm/.htb entries"
+        echo -e " \n${YELLOW}Example:${RESET}"
+        echo "  ctfhost add 10.10.148.147 login.thm"
+        echo "  ctfhost rm login.thm"
+        echo "  ctfhost list"
+        echo "  ctfhost flush"
+        ;;
+esac
