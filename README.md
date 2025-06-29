@@ -20,7 +20,7 @@ CTFHOST is a lightweight Bash script designed to streamline DNS management for c
 
 ## 🚀 Installation
 
-### Option 1: Debian Package (Recommended)
+### Option 1: [Debian Package](https://github.com/LavSarkari/ctfhost/releases/tag/v1.0) (Recommended)
 
 ```bash
 # Download and install the .deb package
